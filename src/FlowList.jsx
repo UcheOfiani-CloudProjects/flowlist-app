@@ -140,7 +140,7 @@ export default function FlowList() {
   const pendingCount = tasks.filter((t) => !t.done).length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", padding: "24px 16px", display: "flex", alignItems: "flex-start", justifyContent: "center", fontFamily: "'Satoshi','Inter',sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", padding: "24px 16px", display: "flex", alignItems: "flex-start", justifyContent: "center", fontFamily: "'DM Sans','Inter','Helvetica Neue',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
