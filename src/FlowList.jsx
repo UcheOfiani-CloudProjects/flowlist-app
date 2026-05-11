@@ -69,6 +69,9 @@ export default function FlowList() {
   const [dragOverId, setDragOverId] = useState(DRAG_NONE);
   const [shake, setShake] = useState(false);
   const [justAdded, setJustAdded] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const editInputRef = useRef(null);
   const timers = useRef({});
 
   useEffect(() => {
@@ -119,6 +122,19 @@ export default function FlowList() {
   const deleteTask = useCallback((id) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  const startEditing = useCallback((task) => {
+    setEditingId(task.id);
+    setEditingTitle(task.title);
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  }, []);
+
+  const saveEdit = useCallback((id) => {
+    if (!editingTitle.trim()) return;
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title: editingTitle.trim() } : t));
+    setEditingId(null);
+    setEditingTitle("");
+  }, [editingTitle]);
 
   const handleDragStart = (id) => setDragId(id);
   const handleDragOver = (e, id) => { e.preventDefault(); setDragOverId(id); };
@@ -262,10 +278,25 @@ export default function FlowList() {
                   >
                     {task.done ? "✓" : ""}
                   </button>
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: task.done ? "#555" : "#fff", textDecoration: task.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {task.title}
-                    </p>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    {editingId === task.id ? (
+                      <input
+                        ref={editInputRef}
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveEdit(task.id); if (e.key === "Escape") setEditingId(null); }}
+                        onBlur={() => saveEdit(task.id)}
+                        style={{ background: "#2a2a2a", border: "1px solid #444", borderRadius: 8, padding: "4px 10px", color: "#fff", fontSize: 14, fontWeight: 500, width: "100%", outline: "none" }}
+                      />
+                    ) : (
+                      <p
+                        onDoubleClick={() => !task.done && startEditing(task)}
+                        title={task.done ? "" : "Double-click to edit"}
+                        style={{ fontSize: 14, fontWeight: 500, color: task.done ? "#555" : "#fff", textDecoration: task.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: task.done ? "default" : "text" }}
+                      >
+                        {task.title}
+                      </p>
+                    )}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
                       {task.datetime && (
                         <p style={{ fontSize: 12, color: "#555" }}>{formatRelativeTime(task.datetime)}</p>
