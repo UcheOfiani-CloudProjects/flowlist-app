@@ -8,18 +8,31 @@ function requestNotificationPermission() {
   }
 }
 
+let swRegistration = null;
+
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    swRegistration = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+  } catch (e) {
+    console.warn('SW registration failed:', e);
+  }
+}
+
 function scheduleNotification(task) {
   if (!task.datetime || !task.id) return null;
   const fireAt = new Date(task.datetime).getTime();
-  const now = Date.now();
-  const delay = fireAt - now;
-  if (delay <= 0) return null;
+  if (fireAt <= Date.now()) return null;
+  const sw = swRegistration?.active || navigator.serviceWorker?.controller;
+  if (sw && Notification.permission === 'granted') {
+    sw.postMessage({ type: 'SCHEDULE_NOTIFICATION', id: task.id, title: task.title, fireAt });
+    return task.id;
+  }
+  const delay = fireAt - Date.now();
   const timerId = setTimeout(() => {
-    if (Notification.permission === "granted") {
-      new Notification("FlowList reminder", {
-        body: task.title,
-        icon: "/favicon.ico",
-      });
+    if (Notification.permission === 'granted') {
+      new Notification('FlowList reminder', { body: task.title, icon: '/favicon.ico' });
     }
   }, delay);
   return timerId;
@@ -75,6 +88,7 @@ export default function FlowList() {
   const timers = useRef({});
 
   useEffect(() => {
+    registerSW();
     requestNotificationPermission();
   }, []);
 
