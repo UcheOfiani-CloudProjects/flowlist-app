@@ -45,7 +45,7 @@ function getProductivityScore(tasks) {
   return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
 }
 
-export default function FlowList() {
+export default function FlowList({ session }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
@@ -93,13 +93,14 @@ export default function FlowList() {
   }, [tasks]);
 
   async function fetchTasks() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error) setTasks(data || []);
-    setLoading(false);
+  setLoading(true);
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false });
+  if (!error) setTasks(data || []);
+  setLoading(false);
   }
 
   const handleEnableNotifications = async () => {
@@ -117,10 +118,11 @@ export default function FlowList() {
       return;
     }
     const newTask = {
-      title: title.trim(),
-      datetime: datetime || null,
-      recurring,
-      done: false,
+  title: title.trim(),
+  datetime: datetime || null,
+  recurring,
+  done: false,
+  user_id: session.user.id,
     };
     const { data, error } = await supabase.from("tasks").insert([newTask]).select();
     if (!error && data) {
@@ -266,14 +268,24 @@ export default function FlowList() {
       <div style={{ width: "100%", maxWidth: 880, display: "grid", gap: 20, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
 
         {/* LEFT PANEL */}
-        <div style={{ background: "#141414", borderRadius: 28, padding: 28, border: "1px solid #222" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-            <div>
-              <p style={{ fontSize: 10, letterSpacing: "0.3em", color: "#555", textTransform: "uppercase" }}>VibeCode</p>
-              <h1 style={{ fontSize: 36, fontWeight: 700, marginTop: 4, letterSpacing: "-0.03em" }}>FlowList</h1>
-            </div>
-            <div style={{ width: 52, height: 52, borderRadius: 16, background: "#fff", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>✦</div>
-          </div>
+<div style={{ background: "#141414", borderRadius: 28, padding: 28, border: "1px solid #222" }}>
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
+    <div>
+      <p style={{ fontSize: 10, letterSpacing: "0.3em", color: "#555", textTransform: "uppercase" }}>VibeCode</p>
+      <h1 style={{ fontSize: 36, fontWeight: 700, marginTop: 4, letterSpacing: "-0.03em" }}>FlowList</h1>
+    </div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+      <div style={{ width: 52, height: 52, borderRadius: 16, background: "#fff", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>✦</div>
+      <button
+        onClick={() => supabase.auth.signOut()}
+        style={{ fontSize: 12, color: "#555", background: "none", border: "1px solid #222", borderRadius: 10, padding: "6px 14px", cursor: "pointer" }}
+        onMouseEnter={(e) => e.target.style.color = "#fff"}
+        onMouseLeave={(e) => e.target.style.color = "#555"}
+      >
+        Sign out
+      </button>
+    </div>
+  </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <input
