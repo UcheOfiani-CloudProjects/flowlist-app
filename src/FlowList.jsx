@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-
-const STORAGE_KEY = "flowlist_tasks_v1";
+import { supabase } from "./supabaseClient";
 
 async function requestAndCheckPermission() {
   if (!("Notification" in window)) return false;
@@ -47,10 +46,8 @@ function getProductivityScore(tasks) {
 }
 
 export default function FlowList() {
-  const [tasks, setTasks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-    catch { return []; }
-  });
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [datetime, setDatetime] = useState("");
   const [recurring, setRecurring] = useState("none");
@@ -65,8 +62,23 @@ export default function FlowList() {
   const timers = useRef({});
   const titleInputRef = useRef(null);
 
+  // Load tasks from Supabase on mount
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    fetchTasks();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel("tasks-channel")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        fetchTasks();
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // Schedule notifications whenever tasks change
+  useEffect(() => {
     Object.values(timers.current).forEach(clearTimeout);
     timers.current = {};
     tasks.forEach((task) => {
@@ -80,6 +92,16 @@ export default function FlowList() {
     return () => Object.values(timers.current).forEach(clearTimeout);
   }, [tasks]);
 
+  async function fetchTasks() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error) setTasks(data || []);
+    setLoading(false);
+  }
+
   const handleEnableNotifications = async () => {
     const granted = await requestAndCheckPermission();
     setNotifGranted(granted);
@@ -88,33 +110,58 @@ export default function FlowList() {
     }
   };
 
-  const addTask = useCallback(() => {
+  const addTask = useCallback(async () => {
     if (!title.trim()) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
       return;
     }
-    const newTask = { id: crypto.randomUUID(), title: title.trim(), datetime, recurring, done: false, createdAt: Date.now() };
-    setTasks((prev) => [newTask, ...prev]);
-    setJustAdded(newTask.id);
-    setTimeout(() => setJustAdded(null), 600);
+    const newTask = {
+      title: title.trim(),
+      datetime: datetime || null,
+      recurring,
+      done: false,
+    };
+    const { data, error } = await supabase.from("tasks").insert([newTask]).select();
+    if (!error && data) {
+      setTasks((prev) => [data[0], ...prev]);
+      setJustAdded(data[0].id);
+      setTimeout(() => setJustAdded(null), 600);
+    }
     setTitle("");
     setDatetime("");
     setRecurring("none");
     titleInputRef.current?.focus();
   }, [title, datetime, recurring]);
 
-  const toggleDone = useCallback((id) => {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
+  const toggleDone = useCallback(async (id, currentDone) => {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ done: !currentDone })
+      .eq("id", id);
+    if (!error) {
+      setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !currentDone } : t));
+    }
   }, []);
 
-  const deleteTask = useCallback((id) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+  const deleteTask = useCallback(async (id) => {
+    const { error } = await supabase.from("tasks").delete().eq("id", id);
+    if (!error) setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const saveEdit = useCallback(() => {
+  const saveEdit = useCallback(async () => {
     if (!editTask || !editTask.title.trim()) return;
-    setTasks((prev) => prev.map((t) => t.id === editTask.id ? { ...editTask, title: editTask.title.trim() } : t));
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        title: editTask.title.trim(),
+        datetime: editTask.datetime || null,
+        recurring: editTask.recurring,
+      })
+      .eq("id", editTask.id);
+    if (!error) {
+      setTasks((prev) => prev.map((t) => t.id === editTask.id ? { ...editTask, title: editTask.title.trim() } : t));
+    }
     setEditTask(null);
   }, [editTask]);
 
@@ -149,11 +196,13 @@ export default function FlowList() {
         @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
         @keyframes pop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
         @keyframes fadeIn { from{opacity:0;transform:scale(0.97)} to{opacity:1;transform:scale(1)} }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .task-row { animation: slideIn 0.3s cubic-bezier(.22,.68,0,1.2) both; }
         .just-added { animation: pop 0.35s ease both; }
         .drag-over { outline: 1.5px dashed rgba(255,255,255,0.2); border-radius: 18px; }
         .shake-it { animation: shake 0.4s ease both; }
         .score-ring { transition: stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1); }
+        .spinner { width: 20px; height: 20px; border: 2px solid #333; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 40px auto; }
         button { cursor: pointer; font-family: inherit; }
         input, select { font-family: inherit; }
         .edit-btn { opacity: 0; transition: opacity 0.15s; }
@@ -184,7 +233,7 @@ export default function FlowList() {
                 <label style={{ fontSize: 12, color: "#666", display: "block", marginBottom: 6 }}>Date & time</label>
                 <input
                   type="datetime-local"
-                  value={editTask.datetime}
+                  value={editTask.datetime || ""}
                   onChange={(e) => setEditTask({ ...editTask, datetime: e.target.value })}
                   style={{ width: "100%", background: "#222", border: "1px solid #333", borderRadius: 12, padding: "12px 14px", color: "#aaa", fontSize: 14, outline: "none" }}
                 />
@@ -202,16 +251,10 @@ export default function FlowList() {
                 </select>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                <button
-                  onClick={() => setEditTask(null)}
-                  style={{ flex: 1, background: "transparent", border: "1px solid #333", borderRadius: 12, padding: "12px", color: "#888", fontSize: 14 }}
-                >
+                <button onClick={() => setEditTask(null)} style={{ flex: 1, background: "transparent", border: "1px solid #333", borderRadius: 12, padding: "12px", color: "#888", fontSize: 14 }}>
                   Cancel
                 </button>
-                <button
-                  onClick={saveEdit}
-                  style={{ flex: 1, background: "#fff", border: "none", borderRadius: 12, padding: "12px", color: "#000", fontSize: 14, fontWeight: 600 }}
-                >
+                <button onClick={saveEdit} style={{ flex: 1, background: "#fff", border: "none", borderRadius: 12, padding: "12px", color: "#000", fontSize: 14, fontWeight: 600 }}>
                   Save changes
                 </button>
               </div>
@@ -272,10 +315,11 @@ export default function FlowList() {
           </div>
 
           <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 10 }}>
-            {tasks.length === 0 && (
+            {loading && <div className="spinner" />}
+            {!loading && tasks.length === 0 && (
               <div style={{ textAlign: "center", padding: "32px 0", color: "#444", fontSize: 14 }}>No tasks yet — add one above</div>
             )}
-            {tasks.map((task) => {
+            {!loading && tasks.map((task) => {
               const overdue = !task.done && isOverdue(task.datetime);
               return (
                 <div
@@ -297,7 +341,7 @@ export default function FlowList() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
                     <button
-                      onClick={() => toggleDone(task.id)}
+                      onClick={() => toggleDone(task.id, task.done)}
                       style={{ width: 26, height: 26, borderRadius: "50%", border: task.done ? "none" : "2px solid #444", background: task.done ? "#fff" : "transparent", color: "#000", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s" }}
                     >
                       {task.done ? "✓" : ""}
