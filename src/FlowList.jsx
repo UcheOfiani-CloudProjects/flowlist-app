@@ -81,16 +81,26 @@ export default function FlowList({ session }) {
   const timers = useRef({});
   const titleInputRef = useRef(null);
 
-  useEffect(() => {
-    fetchTasks();
-    const channel = supabase
-      .channel("tasks-channel")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+ useEffect(() => {
+  fetchTasks();
+
+  const channel = supabase
+    .channel("tasks-channel")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "tasks",
+      },
+      () => {
         fetchTasks();
-      })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, []);
+      }
+    )
+    .subscribe();
+
+  return () => supabase.removeChannel(channel);
+}, [fetchTasks]);
 
   useEffect(() => {
     Object.values(timers.current).forEach(clearTimeout);
