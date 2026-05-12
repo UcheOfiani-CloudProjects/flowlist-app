@@ -45,6 +45,25 @@ function getProductivityScore(tasks) {
   return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
 }
 
+const C = {
+  bg: "#FDF8F6",
+  bgCard: "#FFFFFF",
+  bgMuted: "#FDF0EB",
+  border: "#EDD5C8",
+  borderLight: "#F5E4DC",
+  accent: "#A85C42",
+  accentHover: "#8F4E38",
+  accentLight: "#FAECE7",
+  textPrimary: "#3D2B24",
+  textSecondary: "#9A7068",
+  textMuted: "#C4A89E",
+  overdueText: "#8F4E38",
+  overdueBorder: "#E8B4A0",
+  successBg: "#F0F7EE",
+  successBorder: "#B8D8B2",
+  successText: "#3A6E34",
+};
+
 export default function FlowList({ session }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,22 +81,17 @@ export default function FlowList({ session }) {
   const timers = useRef({});
   const titleInputRef = useRef(null);
 
-  // Load tasks from Supabase on mount
   useEffect(() => {
     fetchTasks();
-
-    // Realtime subscription
     const channel = supabase
       .channel("tasks-channel")
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
         fetchTasks();
       })
       .subscribe();
-
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // Schedule notifications whenever tasks change
   useEffect(() => {
     Object.values(timers.current).forEach(clearTimeout);
     timers.current = {};
@@ -93,14 +107,14 @@ export default function FlowList({ session }) {
   }, [tasks]);
 
   async function fetchTasks() {
-  setLoading(true);
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("user_id", session.user.id)
-    .order("created_at", { ascending: false });
-  if (!error) setTasks(data || []);
-  setLoading(false);
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false });
+    if (!error) setTasks(data || []);
+    setLoading(false);
   }
 
   const handleEnableNotifications = async () => {
@@ -118,11 +132,11 @@ export default function FlowList({ session }) {
       return;
     }
     const newTask = {
-  title: title.trim(),
-  datetime: datetime || null,
-  recurring,
-  done: false,
-  user_id: session.user.id,
+      title: title.trim(),
+      datetime: datetime || null,
+      recurring,
+      done: false,
+      user_id: session.user.id,
     };
     const { data, error } = await supabase.from("tasks").insert([newTask]).select();
     if (!error && data) {
@@ -134,16 +148,11 @@ export default function FlowList({ session }) {
     setDatetime("");
     setRecurring("none");
     titleInputRef.current?.focus();
-  }, [title, datetime, recurring]);
+  }, [title, datetime, recurring, session]);
 
   const toggleDone = useCallback(async (id, currentDone) => {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ done: !currentDone })
-      .eq("id", id);
-    if (!error) {
-      setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !currentDone } : t));
-    }
+    const { error } = await supabase.from("tasks").update({ done: !currentDone }).eq("id", id);
+    if (!error) setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !currentDone } : t));
   }, []);
 
   const deleteTask = useCallback(async (id) => {
@@ -155,15 +164,9 @@ export default function FlowList({ session }) {
     if (!editTask || !editTask.title.trim()) return;
     const { error } = await supabase
       .from("tasks")
-      .update({
-        title: editTask.title.trim(),
-        datetime: editTask.datetime || null,
-        recurring: editTask.recurring,
-      })
+      .update({ title: editTask.title.trim(), datetime: editTask.datetime || null, recurring: editTask.recurring })
       .eq("id", editTask.id);
-    if (!error) {
-      setTasks((prev) => prev.map((t) => t.id === editTask.id ? { ...editTask, title: editTask.title.trim() } : t));
-    }
+    if (!error) setTasks((prev) => prev.map((t) => t.id === editTask.id ? { ...editTask, title: editTask.title.trim() } : t));
     setEditTask(null);
   }, [editTask]);
 
@@ -189,11 +192,11 @@ export default function FlowList({ session }) {
   const pendingCount = tasks.filter((t) => !t.done).length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#fff", padding: "24px 16px", display: "flex", alignItems: "flex-start", justifyContent: "center", fontFamily: "'DM Sans','Helvetica Neue',sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.textPrimary, padding: "24px 16px", display: "flex", alignItems: "flex-start", justifyContent: "center", fontFamily: "'DM Sans','Helvetica Neue',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.4); cursor: pointer; }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: opacity(0.4); cursor: pointer; }
         @keyframes slideIn { from { opacity:0; transform:translateY(-10px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
         @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
         @keyframes pop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
@@ -201,51 +204,50 @@ export default function FlowList({ session }) {
         @keyframes spin { to { transform: rotate(360deg); } }
         .task-row { animation: slideIn 0.3s cubic-bezier(.22,.68,0,1.2) both; }
         .just-added { animation: pop 0.35s ease both; }
-        .drag-over { outline: 1.5px dashed rgba(255,255,255,0.2); border-radius: 18px; }
+        .drag-over { outline: 1.5px dashed #EDD5C8; border-radius: 18px; }
         .shake-it { animation: shake 0.4s ease both; }
         .score-ring { transition: stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1); }
-        .spinner { width: 20px; height: 20px; border: 2px solid #333; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 40px auto; }
+        .spinner { width: 20px; height: 20px; border: 2px solid #EDD5C8; border-top-color: #A85C42; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 40px auto; }
         button { cursor: pointer; font-family: inherit; }
-        input, select { font-family: inherit; }
+        input, select { font-family: inherit; color: ${C.textPrimary}; }
+        input::placeholder { color: ${C.textMuted}; }
         .edit-btn { opacity: 0; transition: opacity 0.15s; }
         .task-row:hover .edit-btn { opacity: 1; }
-        .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:100; animation: fadeIn 0.2s ease; padding: 20px; }
-        .modal { background:#1a1a1a; border:1px solid #333; border-radius:24px; padding:28px; width:100%; max-width:420px; }
+        .overlay { position:fixed; inset:0; background:rgba(61,43,36,0.5); display:flex; align-items:center; justify-content:center; z-index:100; animation: fadeIn 0.2s ease; padding: 20px; }
+        .modal { background:#FFF; border:1px solid #EDD5C8; border-radius:24px; padding:28px; width:100%; max-width:420px; }
       `}</style>
 
       {/* EDIT MODAL */}
       {editTask && (
         <div className="overlay" onClick={(e) => e.target.classList.contains("overlay") && setEditTask(null)}>
           <div className="modal">
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>Edit task</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20, color: C.textPrimary }}>Edit task</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: "#666", display: "block", marginBottom: 6 }}>Task title</label>
+                <label style={{ fontSize: 12, color: C.textSecondary, display: "block", marginBottom: 6 }}>Task title</label>
                 <input
                   autoFocus
                   value={editTask.title}
                   onChange={(e) => setEditTask({ ...editTask, title: e.target.value })}
                   onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditTask(null); }}
-                  style={{ width: "100%", background: "#222", border: "1px solid #333", borderRadius: 12, padding: "12px 14px", color: "#fff", fontSize: 14, outline: "none" }}
-                  onFocus={(e) => e.target.style.borderColor = "#555"}
-                  onBlur={(e) => e.target.style.borderColor = "#333"}
+                  style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", color: C.textPrimary, fontSize: 14, outline: "none" }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: "#666", display: "block", marginBottom: 6 }}>Date & time</label>
+                <label style={{ fontSize: 12, color: C.textSecondary, display: "block", marginBottom: 6 }}>Date & time</label>
                 <input
                   type="datetime-local"
                   value={editTask.datetime || ""}
                   onChange={(e) => setEditTask({ ...editTask, datetime: e.target.value })}
-                  style={{ width: "100%", background: "#222", border: "1px solid #333", borderRadius: 12, padding: "12px 14px", color: "#aaa", fontSize: 14, outline: "none" }}
+                  style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", color: C.textSecondary, fontSize: 14, outline: "none" }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: "#666", display: "block", marginBottom: 6 }}>Repeat</label>
+                <label style={{ fontSize: 12, color: C.textSecondary, display: "block", marginBottom: 6 }}>Repeat</label>
                 <select
                   value={editTask.recurring}
                   onChange={(e) => setEditTask({ ...editTask, recurring: e.target.value })}
-                  style={{ width: "100%", background: "#222", border: "1px solid #333", borderRadius: 12, padding: "12px 14px", color: "#aaa", fontSize: 14, outline: "none" }}
+                  style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", color: C.textSecondary, fontSize: 14, outline: "none" }}
                 >
                   <option value="none">Once</option>
                   <option value="daily">Daily</option>
@@ -253,10 +255,10 @@ export default function FlowList({ session }) {
                 </select>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                <button onClick={() => setEditTask(null)} style={{ flex: 1, background: "transparent", border: "1px solid #333", borderRadius: 12, padding: "12px", color: "#888", fontSize: 14 }}>
+                <button onClick={() => setEditTask(null)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px", color: C.textSecondary, fontSize: 14 }}>
                   Cancel
                 </button>
-                <button onClick={saveEdit} style={{ flex: 1, background: "#fff", border: "none", borderRadius: 12, padding: "12px", color: "#000", fontSize: 14, fontWeight: 600 }}>
+                <button onClick={saveEdit} style={{ flex: 1, background: C.accent, border: "none", borderRadius: 12, padding: "12px", color: "#fff", fontSize: 14, fontWeight: 600 }}>
                   Save changes
                 </button>
               </div>
@@ -268,24 +270,24 @@ export default function FlowList({ session }) {
       <div style={{ width: "100%", maxWidth: 880, display: "grid", gap: 20, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
 
         {/* LEFT PANEL */}
-<div style={{ background: "#141414", borderRadius: 28, padding: 28, border: "1px solid #222" }}>
-  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-    <div>
-      <p style={{ fontSize: 10, letterSpacing: "0.3em", color: "#555", textTransform: "uppercase" }}>VibeCode</p>
-      <h1 style={{ fontSize: 36, fontWeight: 700, marginTop: 4, letterSpacing: "-0.03em" }}>FlowList</h1>
-    </div>
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-      <div style={{ width: 52, height: 52, borderRadius: 16, background: "#fff", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>✦</div>
-      <button
-        onClick={() => supabase.auth.signOut()}
-        style={{ fontSize: 12, color: "#555", background: "none", border: "1px solid #222", borderRadius: 10, padding: "6px 14px", cursor: "pointer" }}
-        onMouseEnter={(e) => e.target.style.color = "#fff"}
-        onMouseLeave={(e) => e.target.style.color = "#555"}
-      >
-        Sign out
-      </button>
-    </div>
-  </div>
+        <div style={{ background: C.bgCard, borderRadius: 28, padding: 28, border: `1px solid ${C.borderLight}`, boxShadow: "0 2px 20px rgba(168,92,66,0.06)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
+            <div>
+              <p style={{ fontSize: 10, letterSpacing: "0.3em", color: C.textMuted, textTransform: "uppercase" }}>VibeCode</p>
+              <h1 style={{ fontSize: 36, fontWeight: 700, marginTop: 4, letterSpacing: "-0.03em", color: C.textPrimary }}>FlowList</h1>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 16, background: C.accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>✦</div>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                style={{ fontSize: 12, color: C.textMuted, background: "none", border: `1px solid ${C.borderLight}`, borderRadius: 10, padding: "6px 14px", transition: "color 0.15s" }}
+                onMouseEnter={(e) => e.target.style.color = C.accent}
+                onMouseLeave={(e) => e.target.style.color = C.textMuted}
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <input
@@ -295,21 +297,21 @@ export default function FlowList({ session }) {
               onKeyDown={(e) => e.key === "Enter" && addTask()}
               placeholder="What needs to get done?"
               className={shake ? "shake-it" : ""}
-              style={{ background: "#1e1e1e", border: "1px solid #2a2a2a", borderRadius: 16, padding: "14px 18px", color: "#fff", fontSize: 14, outline: "none" }}
-              onFocus={(e) => e.target.style.borderColor = "#444"}
-              onBlur={(e) => e.target.style.borderColor = "#2a2a2a"}
+              style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 18px", fontSize: 14, outline: "none" }}
+              onFocus={(e) => e.target.style.borderColor = C.accent}
+              onBlur={(e) => e.target.style.borderColor = C.border}
             />
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
               <input
                 type="datetime-local"
                 value={datetime}
                 onChange={(e) => setDatetime(e.target.value)}
-                style={{ background: "#1e1e1e", border: "1px solid #2a2a2a", borderRadius: 16, padding: "12px 16px", color: "#aaa", fontSize: 13, outline: "none" }}
+                style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: "12px 16px", color: C.textSecondary, fontSize: 13, outline: "none" }}
               />
               <select
                 value={recurring}
                 onChange={(e) => setRecurring(e.target.value)}
-                style={{ background: "#1e1e1e", border: "1px solid #2a2a2a", borderRadius: 16, padding: "12px 14px", color: "#aaa", fontSize: 12, outline: "none" }}
+                style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: "12px 14px", color: C.textSecondary, fontSize: 12, outline: "none" }}
               >
                 <option value="none">Once</option>
                 <option value="daily">Daily</option>
@@ -318,9 +320,9 @@ export default function FlowList({ session }) {
             </div>
             <button
               onClick={addTask}
-              style={{ width: "100%", background: "#fff", color: "#000", fontWeight: 600, fontSize: 15, padding: "14px", borderRadius: 16, border: "none", transition: "transform 0.15s, background 0.15s" }}
-              onMouseEnter={(e) => { e.target.style.background = "#e8e8e8"; e.target.style.transform = "scale(1.01)"; }}
-              onMouseLeave={(e) => { e.target.style.background = "#fff"; e.target.style.transform = "scale(1)"; }}
+              style={{ width: "100%", background: C.accent, color: "#fff", fontWeight: 600, fontSize: 15, padding: "14px", borderRadius: 16, border: "none", transition: "transform 0.15s, background 0.15s" }}
+              onMouseEnter={(e) => { e.target.style.background = C.accentHover; e.target.style.transform = "scale(1.01)"; }}
+              onMouseLeave={(e) => { e.target.style.background = C.accent; e.target.style.transform = "scale(1)"; }}
             >
               Add Task
             </button>
@@ -329,7 +331,7 @@ export default function FlowList({ session }) {
           <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 10 }}>
             {loading && <div className="spinner" />}
             {!loading && tasks.length === 0 && (
-              <div style={{ textAlign: "center", padding: "32px 0", color: "#444", fontSize: 14 }}>No tasks yet — add one above</div>
+              <div style={{ textAlign: "center", padding: "32px 0", color: C.textMuted, fontSize: 14 }}>No tasks yet — add one above</div>
             )}
             {!loading && tasks.map((task) => {
               const overdue = !task.done && isOverdue(task.datetime);
@@ -343,8 +345,8 @@ export default function FlowList({ session }) {
                   onDrop={() => handleDrop(task.id)}
                   onDragEnd={() => { setDragId(null); setDragOverId(null); }}
                   style={{
-                    background: dragId === task.id ? "#1a1a1a" : "#1e1e1e",
-                    border: `1px solid ${overdue ? "#5a2020" : "#2a2a2a"}`,
+                    background: task.done ? C.bg : C.bgCard,
+                    border: `1px solid ${overdue ? C.overdueBorder : C.borderLight}`,
                     borderRadius: 18, padding: "14px 16px",
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     opacity: dragId === task.id ? 0.4 : 1,
@@ -354,22 +356,22 @@ export default function FlowList({ session }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
                     <button
                       onClick={() => toggleDone(task.id, task.done)}
-                      style={{ width: 26, height: 26, borderRadius: "50%", border: task.done ? "none" : "2px solid #444", background: task.done ? "#fff" : "transparent", color: "#000", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s" }}
+                      style={{ width: 24, height: 24, borderRadius: "50%", border: task.done ? "none" : `2px solid ${C.border}`, background: task.done ? C.accent : "transparent", color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s" }}
                     >
                       {task.done ? "✓" : ""}
                     </button>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <p style={{ fontSize: 14, fontWeight: 500, color: task.done ? "#555" : overdue ? "#e07070" : "#fff", textDecoration: task.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <p style={{ fontSize: 14, fontWeight: 500, color: task.done ? C.textMuted : overdue ? C.overdueText : C.textPrimary, textDecoration: task.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {task.title}
                       </p>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, flexWrap: "wrap" }}>
                         {task.datetime && (
-                          <p style={{ fontSize: 12, color: overdue ? "#a04040" : "#555" }}>
+                          <p style={{ fontSize: 12, color: overdue ? C.overdueText : C.textMuted }}>
                             {overdue ? "⚠ " : ""}{formatRelativeTime(task.datetime)}
                           </p>
                         )}
                         {task.recurring !== "none" && (
-                          <span style={{ fontSize: 10, background: "#2a2a2a", color: "#888", padding: "2px 7px", borderRadius: 20 }}>{task.recurring}</span>
+                          <span style={{ fontSize: 10, background: C.accentLight, color: C.accent, padding: "2px 7px", borderRadius: 20, fontWeight: 500 }}>{task.recurring}</span>
                         )}
                       </div>
                     </div>
@@ -378,17 +380,17 @@ export default function FlowList({ session }) {
                     <button
                       className="edit-btn"
                       onClick={() => setEditTask({ ...task })}
-                      style={{ fontSize: 12, color: "#666", background: "#2a2a2a", border: "none", borderRadius: 8, padding: "4px 10px", transition: "color 0.15s, background 0.15s" }}
-                      onMouseEnter={(e) => { e.target.style.color = "#fff"; e.target.style.background = "#333"; }}
-                      onMouseLeave={(e) => { e.target.style.color = "#666"; e.target.style.background = "#2a2a2a"; }}
+                      style={{ fontSize: 12, color: C.textMuted, background: C.bg, border: "none", borderRadius: 8, padding: "4px 10px", transition: "color 0.15s" }}
+                      onMouseEnter={(e) => e.target.style.color = C.accent}
+                      onMouseLeave={(e) => e.target.style.color = C.textMuted}
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => deleteTask(task.id)}
-                      style={{ fontSize: 12, color: "#444", background: "none", border: "none", transition: "color 0.15s" }}
-                      onMouseEnter={(e) => e.target.style.color = "#e55"}
-                      onMouseLeave={(e) => e.target.style.color = "#444"}
+                      style={{ fontSize: 12, color: C.textMuted, background: "none", border: "none", transition: "color 0.15s" }}
+                      onMouseEnter={(e) => e.target.style.color = "#c0392b"}
+                      onMouseLeave={(e) => e.target.style.color = C.textMuted}
                     >
                       Delete
                     </button>
@@ -402,42 +404,45 @@ export default function FlowList({ session }) {
         {/* RIGHT PANEL */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-          <div style={{ background: "#fff", borderRadius: 28, padding: 28, color: "#000" }}>
-            <p style={{ fontSize: 10, letterSpacing: "0.3em", color: "#888", textTransform: "uppercase" }}>Productivity Pulse</p>
+          {/* PRODUCTIVITY PULSE */}
+          <div style={{ background: C.bgCard, borderRadius: 28, padding: 28, border: `1px solid ${C.borderLight}`, boxShadow: "0 2px 20px rgba(168,92,66,0.06)" }}>
+            <p style={{ fontSize: 10, letterSpacing: "0.3em", color: C.textMuted, textTransform: "uppercase" }}>Productivity Pulse</p>
             <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 16 }}>
               <svg width="72" height="72" viewBox="0 0 72 72" style={{ flexShrink: 0 }}>
-                <circle cx="36" cy="36" r="30" fill="none" stroke="#eee" strokeWidth="6" />
-                <circle className="score-ring" cx="36" cy="36" r="30" fill="none" stroke="#000" strokeWidth="6" strokeLinecap="round"
+                <circle cx="36" cy="36" r="30" fill="none" stroke={C.borderLight} strokeWidth="6" />
+                <circle className="score-ring" cx="36" cy="36" r="30" fill="none" stroke={C.accent} strokeWidth="6" strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 30}`}
                   strokeDashoffset={`${2 * Math.PI * 30 * (1 - score / 100)}`}
                   transform="rotate(-90 36 36)"
                 />
-                <text x="36" y="41" textAnchor="middle" fontSize="16" fontWeight="700" fill="#000" fontFamily="DM Sans,sans-serif">{score}%</text>
+                <text x="36" y="41" textAnchor="middle" fontSize="16" fontWeight="700" fill={C.accent} fontFamily="DM Sans,sans-serif">{score}%</text>
               </svg>
-              <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6 }}>
+              <p style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6 }}>
                 {doneCount} done · {pendingCount} pending{score >= 80 ? " 🔥 Keep going!" : score >= 50 ? " Solid progress." : tasks.length === 0 ? " Add your first task." : " Let's get moving."}
               </p>
             </div>
           </div>
 
-          <div style={{ background: "#141414", border: "1px solid #222", borderRadius: 28, padding: 28 }}>
+          {/* NEXT REMINDER */}
+          <div style={{ background: C.bgMuted, border: `1px solid ${C.borderLight}`, borderRadius: 28, padding: 28 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <p style={{ fontSize: 12, color: "#555" }}>Next reminder</p>
-                <h3 style={{ fontSize: 20, fontWeight: 600, marginTop: 6, letterSpacing: "-0.02em" }}>{nextReminder ? nextReminder.title : "Nothing scheduled"}</h3>
+                <p style={{ fontSize: 12, color: C.textMuted }}>Next reminder</p>
+                <h3 style={{ fontSize: 20, fontWeight: 600, marginTop: 6, letterSpacing: "-0.02em", color: C.textPrimary }}>{nextReminder ? nextReminder.title : "Nothing scheduled"}</h3>
               </div>
-              <div style={{ width: 46, height: 46, borderRadius: 14, background: "#1e1e1e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⏰</div>
+              <div style={{ width: 46, height: 46, borderRadius: 14, background: C.accentLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⏰</div>
             </div>
             {nextReminder && (
-              <div style={{ marginTop: 16, padding: "12px 16px", background: "#1e1e1e", borderRadius: 16, border: "1px solid #2a2a2a" }}>
-                <p style={{ fontSize: 13, color: "#aaa" }}>{formatRelativeTime(nextReminder.datetime)}</p>
+              <div style={{ marginTop: 16, padding: "12px 16px", background: C.bgCard, borderRadius: 16, border: `1px solid ${C.borderLight}` }}>
+                <p style={{ fontSize: 13, color: C.textSecondary }}>{formatRelativeTime(nextReminder.datetime)}</p>
               </div>
             )}
-            {!nextReminder && <p style={{ marginTop: 12, fontSize: 13, color: "#444" }}>Add a task with a date/time to get reminded.</p>}
+            {!nextReminder && <p style={{ marginTop: 12, fontSize: 13, color: C.textMuted }}>Add a task with a date/time to get reminded.</p>}
           </div>
 
-          <div style={{ background: "#141414", border: "1px solid #222", borderRadius: 28, padding: 28 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Quick stats</h3>
+          {/* STATS */}
+          <div style={{ background: C.bgCard, border: `1px solid ${C.borderLight}`, borderRadius: 28, padding: 28, boxShadow: "0 2px 20px rgba(168,92,66,0.06)" }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: C.textPrimary }}>Quick stats</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {[
                 { label: "Total tasks", value: tasks.length },
@@ -445,9 +450,9 @@ export default function FlowList({ session }) {
                 { label: "Pending", value: pendingCount },
                 { label: "With reminders", value: tasks.filter((t) => t.datetime).length },
               ].map(({ label, value }) => (
-                <div key={label} style={{ background: "#1e1e1e", borderRadius: 16, padding: "14px 16px" }}>
-                  <p style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>{label}</p>
-                  <p style={{ fontSize: 24, fontWeight: 600 }}>{value}</p>
+                <div key={label} style={{ background: C.bg, borderRadius: 16, padding: "14px 16px", border: `1px solid ${C.borderLight}` }}>
+                  <p style={{ fontSize: 11, color: C.textMuted, marginBottom: 6 }}>{label}</p>
+                  <p style={{ fontSize: 24, fontWeight: 600, color: C.textPrimary }}>{value}</p>
                 </div>
               ))}
             </div>
@@ -456,15 +461,15 @@ export default function FlowList({ session }) {
           {!notifGranted && (
             <button
               onClick={handleEnableNotifications}
-              style={{ background: "#1e1e1e", border: "1px dashed #333", borderRadius: 20, padding: "16px 20px", color: "#888", fontSize: 13, textAlign: "left", transition: "border-color 0.2s, color 0.2s" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#555"; e.currentTarget.style.color = "#ccc"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#333"; e.currentTarget.style.color = "#888"; }}
+              style={{ background: C.accentLight, border: `1px dashed ${C.border}`, borderRadius: 20, padding: "16px 20px", color: C.textSecondary, fontSize: 13, textAlign: "left", transition: "border-color 0.2s, color 0.2s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSecondary; }}
             >
               ⏰ Enable notifications to get reminded when tasks are due →
             </button>
           )}
           {notifGranted && (
-            <div style={{ background: "#0f1f0f", border: "1px solid #1a3a1a", borderRadius: 20, padding: "14px 20px", fontSize: 13, color: "#4a9a4a" }}>
+            <div style={{ background: C.successBg, border: `1px solid ${C.successBorder}`, borderRadius: 20, padding: "14px 20px", fontSize: 13, color: C.successText }}>
               ✓ Notifications enabled — you'll be reminded on time
             </div>
           )}
