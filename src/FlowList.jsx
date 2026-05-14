@@ -81,7 +81,19 @@ export default function FlowList({ session }) {
   const timers = useRef({});
   const titleInputRef = useRef(null);
 
- useEffect(() => {
+ const fetchTasks = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false });
+    if (!error) setTasks(data || []);
+    setLoading(false);
+  }, [session]);
+
+
+useEffect(() => {
   fetchTasks();
 
   const channel = supabase
@@ -116,17 +128,7 @@ export default function FlowList({ session }) {
     return () => Object.values(timers.current).forEach(clearTimeout);
   }, [tasks]);
 
-  async function fetchTasks() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false });
-    if (!error) setTasks(data || []);
-    setLoading(false);
-  }
-
+  
   const handleEnableNotifications = async () => {
     const granted = await requestAndCheckPermission();
     setNotifGranted(granted);
